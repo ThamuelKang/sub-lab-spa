@@ -15,97 +15,110 @@ form.addEventListener("submit", async (event) => {
         const response = await fetch(endpoint);
         const data = await response.json();
 
-        console.log(data)
+        console.log(data);
 
         if (!response.ok) {
             result.classList.add('error');
             result.classList.remove('hidden');
             result.innerHTML = `
                 <h2>${word}</h2>
-                <h3>${data.title}</h3>
-                <p>${data.message}</p>
-                <p class="meta-details">${data.resolution}</p>
+                <h3>${data.title || "Error"}</h3>
+                <p>${data.message || "Something went wrong."}</p>
+                <p class="meta-details">${data.resolution || ""}</p>
             `;
-        } else {
-            result.classList.remove('error');
-            result.classList.remove('hidden');
+            return;
         }
+
+        result.classList.remove('error');
+        result.classList.remove('hidden');
 
         // DocumentFragment to store everything
         const fragment = document.createDocumentFragment();
 
-        // Word Title
-        const searchedWord = document.createElement('h2');
-        searchedWord.textContent = data[0].word;
-        fragment.appendChild(searchedWord);
+        for (let i = 0; i < data.length; i++) {
+            const entry = data[i];
 
-        // Phonetics
-        const phoneticContainer = document.createElement('div');
-        phoneticContainer.classList.add('phonetic-container');
+            // Word Title
+            const searchedWord = document.createElement('h2');
+            searchedWord.textContent = entry.word;
+            fragment.appendChild(searchedWord);
 
-        for (let i = 0; i < data[0].phonetics.length; i++) {
-            const wordPronunciation = document.createElement('h3');
-            wordPronunciation.textContent = data[0].phonetics[i].text || '';
-            phoneticContainer.appendChild(wordPronunciation)
+            // Phonetics
+            const phoneticContainer = document.createElement('div');
+            phoneticContainer.classList.add('phonetic-container');
+
+            for (let j = 0; j < entry.phonetics.length; j++) {
+                const wordPronunciation = document.createElement('h3');
+                wordPronunciation.textContent = entry.phonetics[j].text || '';
+                phoneticContainer.appendChild(wordPronunciation);
+            }
             fragment.appendChild(phoneticContainer);
-        }
 
-        const audioEntry = data[0].phonetics.find(p => p.audio);
+            const audioEntry = entry.phonetics.find(p => p.audio);
 
-        if (audioEntry) {
-            const audio = new Audio(audioEntry.audio);
+            if (audioEntry) {
+                const audio = new Audio(audioEntry.audio);
 
-            const playButton = document.createElement('button');
-            playButton.textContent = "🔊 Play Pronunciation";
-            playButton.addEventListener('click', () => {
-                audio.play();
-            });
-            fragment.appendChild(playButton)
-        }
-
-
-        // Definitions
-        const meanings = data[0].meanings;
-
-        for (let i = 0; i < meanings.length; i++) {
-            const meaning = meanings[i];
-
-            const container = document.createElement('div');
-            container.classList.add('details');
-
-            const partOfSpeech = document.createElement('p');
-            partOfSpeech.classList.add('part-of-speech');
-            partOfSpeech.textContent = meaning.partOfSpeech;
-            container.appendChild(partOfSpeech);
-
-            if (meaning.synonyms.length) {
-                const synonyms = document.createElement('p');
-                synonyms.classList.add('meta-details');
-                synonyms.textContent = `Synonyms: ${meaning.synonyms.join(", ")}`;
-                container.appendChild(synonyms);
+                const playButton = document.createElement('button');
+                playButton.textContent = "🔊 Play Pronunciation";
+                playButton.addEventListener('click', () => {
+                    audio.play();
+                });
+                fragment.appendChild(playButton);
             }
 
-            if (meaning.antonyms.length) {
-                const antonyms = document.createElement('p');
-                antonyms.classList.add('meta-details');
-                antonyms.textContent = `Antonyms: ${meaning.antonyms.join(", ")}`;
-                container.appendChild(antonyms);
+            // Source 
+            const sourceLink = document.createElement('a');
+            sourceLink.textContent = "View source";
+            sourceLink.href = entry.sourceUrls[0]; 
+            sourceLink.target = "_blank";
+            sourceLink.rel = "noopener noreferrer";
+            fragment.appendChild(sourceLink);
+
+
+            // Meanings
+            const meanings = entry.meanings;
+
+            for (let k = 0; k < meanings.length; k++) {
+                const meaning = meanings[k];
+
+                const container = document.createElement('div');
+                container.classList.add('details');
+
+                const partOfSpeech = document.createElement('p');
+                partOfSpeech.classList.add('part-of-speech');
+                partOfSpeech.textContent = meaning.partOfSpeech;
+                container.appendChild(partOfSpeech);
+
+                if (meaning.synonyms.length) {
+                    const synonyms = document.createElement('p');
+                    synonyms.classList.add('meta-details');
+                    synonyms.textContent = `Synonyms: ${meaning.synonyms.join(", ")}`;
+                    container.appendChild(synonyms);
+                }
+
+                if (meaning.antonyms.length) {
+                    const antonyms = document.createElement('p');
+                    antonyms.classList.add('meta-details');
+                    antonyms.textContent = `Antonyms: ${meaning.antonyms.join(", ")}`;
+                    container.appendChild(antonyms);
+                }
+
+                const definitionList = document.createElement('ul');
+                definitionList.classList.add('definition-container');
+
+                for (let l = 0; l < meaning.definitions.length; l++) {
+                    const li = document.createElement('li');
+                    li.textContent = meaning.definitions[l].definition;
+                    definitionList.appendChild(li);
+                }
+
+                container.appendChild(definitionList);
+                fragment.appendChild(container);
             }
-
-            const definitionList = document.createElement('ul');
-            definitionList.classList.add('definition-container');
-
-            for (let j = 0; j < meaning.definitions.length; j++) {
-                const li = document.createElement('li');
-                li.textContent = meaning.definitions[j].definition;
-                definitionList.appendChild(li);
-            }
-
-            container.appendChild(definitionList);
-            fragment.appendChild(container);
         }
 
-        // Append to container
+        // Append everything at once
         result.appendChild(fragment);
 
     } catch (error) {
