@@ -1,50 +1,118 @@
-
-const form = document.getElementById('form')
-const result = document.getElementById('result')
-
-let endpoint = 'https://api.dictionaryapi.dev/api/v2/entries/en/hello'
+const form = document.getElementById('form');
+const result = document.getElementById('result');
+const searchBar = document.getElementById('search-bar');
 
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    result.innerHTML = "";
+
+    const word = searchBar.value.trim();
+    if (!word) return;
+
+    const endpoint = `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`;
 
     try {
         const response = await fetch(endpoint);
         const data = await response.json();
+
         console.log(data)
 
-        const searchedWord = document.createElement('h2')
-        searchedWord.textContent = data[0].word
-        result.appendChild(searchedWord)
+        if (!response.ok) {
+            result.classList.add('error');
+            result.classList.remove('hidden');
+            result.innerHTML = `
+                <h2>${word}</h2>
+                <h3>${data.title}</h3>
+                <p>${data.message}</p>
+                <p class="meta-details">${data.resolution}</p>
+            `;
+        } else {
+            result.classList.remove('error');
+            result.classList.remove('hidden');
+        }
 
-        const multipleDefinition = data[0].meanings
+        // DocumentFragment to store everything
+        const fragment = document.createDocumentFragment();
 
-        for (i = 0; i < multipleDefinition.length; i++) {
-            const container = document.createElement('div')
-            container.classList.add('definition')
-            result.appendChild(container)
+        // Word Title
+        const searchedWord = document.createElement('h2');
+        searchedWord.textContent = data[0].word;
+        fragment.appendChild(searchedWord);
 
-            const partOfSpeech = document.createElement('p')
-            partOfSpeech.classList.add('part-of-speech')
-            partOfSpeech.textContent = multipleDefinition[i].partOfSpeech
-            container.appendChild(partOfSpeech)
+        // Phonetics
+        const phoneticContainer = document.createElement('div');
+        phoneticContainer.classList.add('phonetic-container');
 
-            const synonyms = document.createElement('p')
-            synonyms.textContent = `synonyms: ${multipleDefinition[i].synonyms}`
-            container.appendChild(synonyms)
+        for (let i = 0; i < data[0].phonetics.length; i++) {
+            const wordPronunciation = document.createElement('h3');
+            wordPronunciation.textContent = data[0].phonetics[i].text || '';
+            phoneticContainer.appendChild(wordPronunciation)
+            fragment.appendChild(phoneticContainer);
+        }
 
-            const antonyms = document.createElement('p')
-            antonyms.textContent = `antonyms: ${multipleDefinition[i].antonyms}`
-            container.appendChild(antonyms)
+        const audioEntry = data[0].phonetics.find(p => p.audio);
 
-            for (j = 0; j < multipleDefinition[i].definitions.length; j++) {
-                const newDefinition = document.createElement('p')
-                newDefinition.textContent = multipleDefinition[i].definitions[j].definition
-                container.appendChild(newDefinition)
+        if (audioEntry) {
+            const audio = new Audio(audioEntry.audio);
+
+            const playButton = document.createElement('button');
+            playButton.textContent = "🔊 Play Pronunciation";
+            playButton.addEventListener('click', () => {
+                audio.play();
+            });
+            fragment.appendChild(playButton)
+        }
+
+
+        // Definitions
+        const meanings = data[0].meanings;
+
+        for (let i = 0; i < meanings.length; i++) {
+            const meaning = meanings[i];
+
+            const container = document.createElement('div');
+            container.classList.add('details');
+
+            const partOfSpeech = document.createElement('p');
+            partOfSpeech.classList.add('part-of-speech');
+            partOfSpeech.textContent = meaning.partOfSpeech;
+            container.appendChild(partOfSpeech);
+
+            if (meaning.synonyms.length) {
+                const synonyms = document.createElement('p');
+                synonyms.classList.add('meta-details');
+                synonyms.textContent = `Synonyms: ${meaning.synonyms.join(", ")}`;
+                container.appendChild(synonyms);
             }
 
+            if (meaning.antonyms.length) {
+                const antonyms = document.createElement('p');
+                antonyms.classList.add('meta-details');
+                antonyms.textContent = `Antonyms: ${meaning.antonyms.join(", ")}`;
+                container.appendChild(antonyms);
+            }
 
+            const definitionList = document.createElement('ul');
+            definitionList.classList.add('definition-container');
+
+            for (let j = 0; j < meaning.definitions.length; j++) {
+                const li = document.createElement('li');
+                li.textContent = meaning.definitions[j].definition;
+                definitionList.appendChild(li);
+            }
+
+            container.appendChild(definitionList);
+            fragment.appendChild(container);
         }
+
+        // Append to container
+        result.appendChild(fragment);
+
     } catch (error) {
+        result.classList.add('error');
+        const errorMessage = document.createElement('p');
+        errorMessage.textContent = `Error: ${error.message}`;
+        result.appendChild(errorMessage);
         console.error("Error fetching the data:", error);
     }
 });
